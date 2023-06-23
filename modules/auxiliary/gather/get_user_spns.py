@@ -65,18 +65,18 @@ class GetUserSPNs:
     def printTable(items, header):
         colLen = []
         for i, col in enumerate(header):
-            rowMaxLen = max([len(row[i]) for row in items])
+            rowMaxLen = max(len(row[i]) for row in items)
             colLen.append(max(rowMaxLen, len(col)))
 
         outputFormat = ' '.join(['{%d:%ds} ' % (num, width) for num, width in enumerate(colLen)])
 
         # Print header
-        module.log('{}'.format(outputFormat.format(*header)), level='good')
-        module.log('{}'.format('  '.join(['-' * itemLen for itemLen in colLen])), level='good')
+        module.log(f'{outputFormat.format(*header)}', level='good')
+        module.log(f"{'  '.join(['-' * itemLen for itemLen in colLen])}", level='good')
 
         # And now the rows
         for row in items:
-            module.log('{}'.format(outputFormat.format(*row)), level='good')
+            module.log(f'{outputFormat.format(*row)}', level='good')
 
     def __init__(self, username, password, user_domain, target_domain, cmdLineOptions):
         self.__username = username
@@ -103,7 +103,7 @@ class GetUserSPNs:
         domainParts = self.__targetDomain.split('.')
         self.baseDN = ''
         for i in domainParts:
-            self.baseDN += 'dc=%s,' % i
+            self.baseDN += f'dc={i},'
         # Remove last ','
         self.baseDN = self.baseDN[:-1]
         # We can't set the KDC to a custom IP or Hostname when requesting things cross-domain
@@ -132,10 +132,10 @@ class GetUserSPNs:
                 raise
         except Exception:
             if s.getServerName() == '':
-                raise Exception('Error while anonymous logging into %s' % target)
+                raise Exception(f'Error while anonymous logging into {target}')
         else:
             s.logoff()
-        return "%s.%s" % (s.getServerName(), s.getServerDNSDomainName())
+        return f"{s.getServerName()}.{s.getServerDNSDomainName()}"
 
     @staticmethod
     def getUnixTime(t):
@@ -162,7 +162,7 @@ class GetUserSPNs:
                                                                         compute_nthash(self.__password), self.__aesKey,
                                                                         kdcHost=self.__kdcIP)
             except Exception as e:
-                module.log('TGT: %s' % str(e), level='error')
+                module.log(f'TGT: {str(e)}', level='error')
                 tgt, cipher, oldSessionKey, sessionKey = getKerberosTGT(userName, self.__password, self.__domain,
                                                                         unhexlify(self.__lmhash),
                                                                         unhexlify(self.__nthash), self.__aesKey,
@@ -204,7 +204,7 @@ class GetUserSPNs:
                 hexlify(decodedTGS['ticket']['enc-part']['cipher'][:16].asOctets()).decode(),
                 hexlify(decodedTGS['ticket']['enc-part']['cipher'][16:].asOctets()).decode())
             if fd is None:
-                module.log('{}'.format(entry), level='good')
+                module.log(f'{entry}', level='good')
             else:
                 fd.write(entry + '\n')
         elif decodedTGS['ticket']['enc-part']['etype'] == constants.EncryptionTypes.aes128_cts_hmac_sha1_96.value:
@@ -214,7 +214,7 @@ class GetUserSPNs:
                 hexlify(decodedTGS['ticket']['enc-part']['cipher'][-12:].asOctets()).decode(),
                 hexlify(decodedTGS['ticket']['enc-part']['cipher'][:-12:].asOctets()).decode())
             if fd is None:
-                module.log('{}'.format(entry), level='good')
+                module.log(f'{entry}', level='good')
             else:
                 fd.write(entry + '\n')
         elif decodedTGS['ticket']['enc-part']['etype'] == constants.EncryptionTypes.aes256_cts_hmac_sha1_96.value:
@@ -224,7 +224,7 @@ class GetUserSPNs:
                 hexlify(decodedTGS['ticket']['enc-part']['cipher'][-12:].asOctets()).decode(),
                 hexlify(decodedTGS['ticket']['enc-part']['cipher'][:-12:].asOctets()).decode())
             if fd is None:
-                module.log('{}'.format(entry), level='good')
+                module.log(f'{entry}', level='good')
             else:
                 fd.write(entry + '\n')
         elif decodedTGS['ticket']['enc-part']['etype'] == constants.EncryptionTypes.des_cbc_md5.value:
@@ -234,7 +234,7 @@ class GetUserSPNs:
                 hexlify(decodedTGS['ticket']['enc-part']['cipher'][:16].asOctets()).decode(),
                 hexlify(decodedTGS['ticket']['enc-part']['cipher'][16:].asOctets()).decode())
             if fd is None:
-                module.log('{}'.format(entry), level='good')
+                module.log(f'{entry}', level='good')
             else:
                 fd.write(entry + '\n')
         else:
@@ -244,11 +244,11 @@ class GetUserSPNs:
 
         if self.__saveTGS is True:
             # Save the ticket
-            module.log('About to save TGS for %s' % username, level='debug')
+            module.log(f'About to save TGS for {username}', level='debug')
             ccache = CCache()
             try:
                 ccache.fromTGS(tgs, oldSessionKey, sessionKey)
-                ccache.saveFile('%s.ccache' % username)
+                ccache.saveFile(f'{username}.ccache')
             except Exception as e:
                 module.log(str(e), level='error')
 

@@ -143,12 +143,11 @@ def oracle(target, pms, cke_2nd_prefix, cipher_handshake=ch_def, messageflow=Fal
             alert = s.recv(4096)
             if len(alert) == 0:
                 return ("No data received from server")
-            if alert[0] == 0x15:
-                if len(alert) < 7:
-                    return ("TLS alert was truncated (%s)" % (repr(alert)))
-                return ("TLS alert %i of length %i" % (alert[6], len(alert)))
-            else:
-                return "Received something other than an alert (%s)" % (alert[0:10])
+            if alert[0] != 0x15:
+                return f"Received something other than an alert ({alert[:10]})"
+            if len(alert) < 7:
+                return f"TLS alert was truncated ({repr(alert)})"
+            return ("TLS alert %i of length %i" % (alert[6], len(alert)))
         except ConnectionResetError as e:
             return "ConnectionResetError"
         except socket.timeout:
@@ -187,15 +186,15 @@ def run(args):
     rnd_pad = ("abcd" * (pad_len // 2 + 1))[:pad_len]
 
     rnd_pms = "aa112233445566778899112233445566778899112233445566778899112233445566778899112233445566778899"
-    pms_good_in = int("0002" + rnd_pad + "00" + "0303" + rnd_pms, 16)
+    pms_good_in = int(f"0002{rnd_pad}000303{rnd_pms}", 16)
     # wrong first two bytes
-    pms_bad_in1 = int("4117" + rnd_pad + "00" + "0303" + rnd_pms, 16)
+    pms_bad_in1 = int(f"4117{rnd_pad}000303{rnd_pms}", 16)
     # 0x00 on a wrong position, also trigger older JSSE bug
-    pms_bad_in2 = int("0002" + rnd_pad + "11" + rnd_pms + "0011", 16)
+    pms_bad_in2 = int(f"0002{rnd_pad}11{rnd_pms}0011", 16)
     # no 0x00 in the middle
-    pms_bad_in3 = int("0002" + rnd_pad + "11" + "1111" + rnd_pms, 16)
+    pms_bad_in3 = int(f"0002{rnd_pad}111111{rnd_pms}", 16)
     # wrong version number (according to Klima / Pokorny / Rosa paper)
-    pms_bad_in4 = int("0002" + rnd_pad + "00" + "0202" + rnd_pms, 16)
+    pms_bad_in4 = int(f"0002{rnd_pad}000202{rnd_pms}", 16)
 
     pms_good = int(gmpy2.powmod(pms_good_in, e, N)).to_bytes(modulus_bytes, byteorder="big")
     pms_bad1 = int(gmpy2.powmod(pms_bad_in1, e, N)).to_bytes(modulus_bytes, byteorder="big")
@@ -245,11 +244,7 @@ def run(args):
     else:
         oracle_strength = "strong"
 
-    if flow:
-        flowt = "shortened"
-    else:
-        flowt = "standard"
-
+    flowt = "shortened" if flow else "standard"
     s, cke_version = tls_connect(target, timeout, cipher_handshake)
     s.close()
 

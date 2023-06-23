@@ -13,7 +13,7 @@ def _cw(word):
 
 
 def _s2b(text):
-    return list(ord(c)for c in text)
+    return [ord(c) for c in text]
 
 
 def _b2s(binary):
@@ -24,9 +24,7 @@ if sys.version_info[0] >= 3:
     xrange = range
 
     def _s2b(text):
-        if isinstance(text, bytes):
-            return text
-        return [ord(c)for c in text]
+        return text if isinstance(text, bytes) else [ord(c)for c in text]
 
     def _b2s(binary):
         return bytes(binary)
@@ -113,8 +111,8 @@ class AESCBC(object):
         if len(key)not in (16, 24, 32):
             raise ValueError('Invalid key size')
         rds = self.nrs[len(key)]
-        self._Ke = [[0] * 4 for i in xrange(rds + 1)]
-        self._Kd = [[0] * 4 for i in xrange(rds + 1)]
+        self._Ke = [[0] * 4 for _ in xrange(rds + 1)]
+        self._Kd = [[0] * 4 for _ in xrange(rds + 1)]
         rnd_kc = (rds + 1) * 4
         KC = len(key) // 4
         tk = [struct.unpack('>i', key[i:i + 4])[0]
@@ -169,10 +167,14 @@ class AESCBC(object):
         rst = []
         for i in xrange(0, 4):
             tt = K[rds][i]
-            rst.append((S[(t[i] >> 24) & 255] ^ (tt >> 24)) & 255)
-            rst.append((S[(t[(i + s1) % 4] >> 16) & 255] ^ (tt >> 16)) & 255)
-            rst.append((S[(t[(i + s2) % 4] >> 8) & 255] ^ (tt >> 8)) & 255)
-            rst.append((S[t[(i + s3) % 4] & 255] ^ tt) & 255)
+            rst.extend(
+                (
+                    (S[(t[i] >> 24) & 255] ^ (tt >> 24)) & 255,
+                    (S[(t[(i + s1) % 4] >> 16) & 255] ^ (tt >> 16)) & 255,
+                    (S[(t[(i + s2) % 4] >> 8) & 255] ^ (tt >> 8)) & 255,
+                    (S[t[(i + s3) % 4] & 255] ^ tt) & 255,
+                )
+            )
         return rst
 
     def enc_in(self, pt):

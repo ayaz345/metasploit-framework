@@ -133,7 +133,6 @@ class DumpSecrets:
                             # target system. We just have a last resort. Hope we have tickets cached and that they
                             # will work
                             logging.debug('SMBConnection didn\'t work, hoping Kerberos will help')
-                            pass
                         else:
                             raise
 
@@ -147,30 +146,26 @@ class DumpSecrets:
                 except Exception as e:
                     self.__canProcessSAMLSA = False
                     if str(e).find('STATUS_USER_SESSION_DELETED') and os.getenv('KRB5CCNAME') is not None \
-                        and self.__doKerberos is True:
+                            and self.__doKerberos is True:
                         # Giving some hints here when SPN target name validation is set to something different to Off
                         # This will prevent establishing SMB connections using TGS for SPNs different to cifs/
                         logging.error('Policy SPN target name validation might be restricting full DRSUAPI dump. Try -just-dc-user')
                     else:
-                        logging.error('RemoteOperations failed: %s' % str(e))
+                        logging.error(f'RemoteOperations failed: {str(e)}')
 
             # If RemoteOperations succeeded, then we can extract SAM and LSA
             if self.__justDC is False and self.__justDCNTLM is False and self.__canProcessSAMLSA:
                 try:
-                    if self.__isRemote is True:
-                        SAMFileName         = self.__remoteOps.saveSAM()
-                    else:
-                        SAMFileName         = self.__samHive
-
+                    SAMFileName = self.__remoteOps.saveSAM() if self.__isRemote else self.__samHive
                     self.__SAMHashes    = SAMHashes(SAMFileName, bootKey, isRemote=self.__isRemote, perSecretCallback=self.perSecretCallback1)
                     self.__SAMHashes.dump()
                     if self.__outputFileName is not None:
                         self.__SAMHashes.export(self.__outputFileName)
                 except Exception as e:
-                    logging.error('SAM hashes extraction failed: %s' % str(e))
+                    logging.error(f'SAM hashes extraction failed: {str(e)}')
 
                 try:
-                    if self.__isRemote is True:
+                    if self.__isRemote:
                         SECURITYFileName = self.__remoteOps.saveSECURITY()
                     else:
                         SECURITYFileName = self.__securityHive
@@ -185,10 +180,10 @@ class DumpSecrets:
                     if self.__outputFileName is not None:
                         self.__LSASecrets.exportSecrets(self.__outputFileName)
                 except Exception as e:
-                    logging.error('LSA hashes extraction failed: %s' % str(e), exc_info=True)
+                    logging.error(f'LSA hashes extraction failed: {str(e)}', exc_info=True)
 
             # NTDS Extraction we can try regardless of RemoteOperations failing. It might still work
-            if self.__isRemote is True:
+            if self.__isRemote:
                 if self.__useVSSMethod and self.__remoteOps is not None:
                     NTDSFileName = self.__remoteOps.saveNTDS()
                 else:
@@ -205,14 +200,14 @@ class DumpSecrets:
             try:
                 self.__NTDSHashes.dump()
             except Exception as e:
-                if str(e).find('ERROR_DS_DRA_BAD_DN') >= 0:
+                if 'ERROR_DS_DRA_BAD_DN' in str(e):
                     # We don't store the resume file if this error happened, since this error is related to lack
                     # of enough privileges to access DRSUAPI.
                     resumeFile = self.__NTDSHashes.getResumeSessionFile()
                     if resumeFile is not None:
                         os.unlink(resumeFile)
                 logging.error(e, exc_info=True)
-                if self.__justUser and str(e).find("ERROR_DS_NAME_ERROR_NOT_UNIQUE") >=0:
+                if self.__justUser and "ERROR_DS_NAME_ERROR_NOT_UNIQUE" in str(e):
                     logging.info("You just got that error because there might be some duplicates of the same name. "
                                  "Try specifying the domain name for the user as well. It is important to specify it "
                                  "in the form of NetBIOS domain name/user (e.g. contoso/Administratror).")
