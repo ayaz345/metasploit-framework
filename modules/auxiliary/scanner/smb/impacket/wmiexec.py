@@ -70,7 +70,7 @@ class WMIEXEC:
             self.__lmhash, self.__nthash = hashes.split(':')
 
     def run(self, addr):
-        if not self.__password and not (self.__lmhash or self.__nthash):
+        if not self.__password and not self.__lmhash and not self.__nthash:
             logging.error("Either SMBPass or HASHES must be set, aborting...")
             return
 

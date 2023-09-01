@@ -79,13 +79,14 @@ def parse_ntlm_t1(message):
         return None
     fields = struct.unpack(struct_fmt, message[:size])
 
-    properties = {'type': fields[0], 'flags': fields[1]}
-
     length, _, offset = fields[2:5]
     if len(message) < offset + length:
         return None
-    properties['domain'] = message[offset:offset+length].decode('utf-8')
-
+    properties = {
+        'type': fields[0],
+        'flags': fields[1],
+        'domain': message[offset : offset + length].decode('utf-8'),
+    }
     length, _, offset = fields[5:8]
     if len(message) < offset + length:
         return None
@@ -95,7 +96,7 @@ def parse_ntlm_t1(message):
 
 def verify_service(rhost, rport, targeturi, timeout, user_agent):
     """Verify the service is up at the target URI within the specified timeout"""
-    url = 'https://{}:{}/{}'.format(rhost, rport, targeturi)
+    url = f'https://{rhost}:{rport}/{targeturi}'
     headers = {'Host':rhost,
                'User-Agent': user_agent}
     try:
@@ -118,7 +119,7 @@ def get_ad_domain(rhost, rport, user_agent):
                'Host': rhost}
     session = requests.Session()
     for url in domain_urls:
-        target_url = 'https://{}:{}/{}'.format(rhost, rport, url)
+        target_url = f'https://{rhost}:{rport}/{url}'
         request = session.get(target_url, headers=headers, verify=False)
         # Decode the provided NTLM Response to strip out the domain name
         if request.status_code == 401 and 'WWW-Authenticate' in request.headers and \
@@ -126,9 +127,11 @@ def get_ad_domain(rhost, rport, user_agent):
             type1_msg = request.headers['WWW-Authenticate'].split('NTLM ')[1].split(',')[0]
             type1_msg = parse_ntlm_t1(type1_msg)
             if type1_msg is None:
-                module.log("NTLM authenticate header was not in the expected format for %s" % url)
+                module.log(
+                    f"NTLM authenticate header was not in the expected format for {url}"
+                )
                 continue
-            module.log('Found Domain: {}'.format(type1_msg['domain']), level='good')
+            module.log(f"Found Domain: {type1_msg['domain']}", level='good')
             return type1_msg['domain']
     module.log('Failed to find the domain', level='error')
     return None
@@ -139,13 +142,15 @@ def check_login(rhost, rport, targeturi, domain, username, password, timeout, us
     The timeout is used to specify the amount of milliseconds where a
     response should consider the username invalid."""
 
-    url = 'https://{}:{}/{}'.format(rhost, rport, targeturi)
-    body = 'DomainUserName={}%5C{}&UserPass={}'.format(domain, username, password)
-    headers = {'Host':rhost,
-               'User-Agent': user_agent,
-               'Content-Type': 'application/x-www-form-urlencoded',
-               'Content-Length': str(len(body)),
-               'Origin': 'https://{}'.format(rhost)}
+    url = f'https://{rhost}:{rport}/{targeturi}'
+    body = f'DomainUserName={domain}%5C{username}&UserPass={password}'
+    headers = {
+        'Host': rhost,
+        'User-Agent': user_agent,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': str(len(body)),
+        'Origin': f'https://{rhost}',
+    }
     session = requests.Session()
     report_data = {'domain':domain, 'address': rhost, 'port': rport,
                    'protocol': 'tcp', 'service_name':'RDWeb'}
@@ -153,19 +158,25 @@ def check_login(rhost, rport, targeturi, domain, username, password, timeout, us
         request = session.post(url, data=body, headers=headers,
                                timeout=(timeout / 1000), verify=False, allow_redirects=False)
         if request.status_code == 302:
-            module.log('Login {}\\{}:{} is valid!'.format(domain, username, password), level='good')
+            module.log(f'Login {domain}\\{username}:{password} is valid!', level='good')
             module.report_correct_password(username, password, **report_data)
         elif request.status_code == 200:
-            module.log('Password {} is invalid but {}\\{} is valid! Response received in {} milliseconds'.format(password, domain, username, request.elapsed.microseconds / 1000),
-                       level='good')
+            module.log(
+                f'Password {password} is invalid but {domain}\\{username} is valid! Response received in {request.elapsed.microseconds / 1000} milliseconds',
+                level='good',
+            )
             module.report_valid_username(username, **report_data)
         else:
-            module.log('Received unknown response with status code: {}'.format(request.status_code))
+            module.log(
+                f'Received unknown response with status code: {request.status_code}'
+            )
     except requests.exceptions.Timeout:
-        module.log('Login {}\\{}:{} is invalid! No response received in {} milliseconds'.format(domain, username, password, timeout),
-                   level='error')
+        module.log(
+            f'Login {domain}\\{username}:{password} is invalid! No response received in {timeout} milliseconds',
+            level='error',
+        )
     except requests.exceptions.RequestException as exc:
-        module.log('{}'.format(exc), level='error')
+        module.log(f'{exc}', level='error')
         return
 
 
@@ -177,7 +188,7 @@ def check_logins(rhost, rport, targeturi, domain, usernames, passwords, timeout,
 
 def run(args):
     """Run the module, gathering the domain if desired and verifying usernames and passwords"""
-    module.LogHandler.setup(msg_prefix='{} - '.format(args['rhost']))
+    module.LogHandler.setup(msg_prefix=f"{args['rhost']} - ")
     if DEPENDENCIES_MISSING:
         module.log('Module dependencies are missing, cannot continue', level='error')
         return
@@ -185,13 +196,19 @@ def run(args):
     user_agent = args['user_agent']
     # Verify the service is up if requested
     if args['verify_service']:
-        service_verified = verify_service(args['rhost'], args['rport'],
-                                          args['targeturi'], int(args['timeout']), user_agent)
-        if service_verified:
+        if service_verified := verify_service(
+            args['rhost'],
+            args['rport'],
+            args['targeturi'],
+            int(args['timeout']),
+            user_agent,
+        ):
             module.log('Service is up, beginning scan...', level='good')
         else:
-            module.log('Service appears to be down, no response in {} milliseconds'.format(args["timeout"]),
-                       level='error')
+            module.log(
+                f'Service appears to be down, no response in {args["timeout"]} milliseconds',
+                level='error',
+            )
             return
 
     # Gather AD Domain either from args or enumeration

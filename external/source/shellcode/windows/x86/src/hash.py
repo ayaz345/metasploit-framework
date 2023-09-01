@@ -66,12 +66,9 @@ def ror(dword, bits):
     return (dword >> bits | dword << (32 - bits)) & 0xFFFFFFFF
 
 def unicode(string, uppercase=True):
-    result = ''
     if uppercase:
         string = string.upper()
-    for c in string:
-        result += c + '\x00'
-    return result
+    return ''.join(c + '\x00' for c in string)
 
 def hash(module, function, bits=13, print_hash=True):
     module_hash = 0
@@ -98,7 +95,7 @@ def scan(dll_path, dll_name, print_hashes=False, print_collisions=True):
             continue
         h = hash(dll_name, export.name, print_hash=print_hashes)
         for (col_hash, col_name) in collisions:
-            if col_hash == h and col_name != '%s!%s' % (dll_name, export.name):
+            if col_hash == h and col_name != f'{dll_name}!{export.name}':
                 if h not in collisions_detected.keys():
                     collisions_detected[h] = []
                 collisions_detected[h].append(
@@ -137,11 +134,10 @@ def main(argv=None):
     else:
         print('[+] Ran on %s\n' % (time.asctime(time.localtime())))
         if argv[1] == '/dir':
-            print("[+] Scanning directory '%s' for collisions..." % argv[2])
+            print(f"[+] Scanning directory '{argv[2]}' for collisions...")
             scan_directory(argv[2])
         elif argv[1] == '/mod':
-            print("[+] Scanning module '%s' in directory '%s'..." %
-                  (argv[3], argv[2]))
+            print(f"[+] Scanning module '{argv[3]}' in directory '{argv[2]}'...")
             scan(argv[2], argv[3], print_hashes=True)
         elif len(argv) < 3:
             usage()
